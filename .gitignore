@@ -8,3 +8,17 @@ node_modules/
 *.pfx
 *.log
 .DS_Store
+
+# Local analysis and private configuration
+.gitnexus/
+.codegraph/
+.agents/
+.claude/
+CLAUDE.md
+AGENTS.md
+local-config*
+
+# Local install copies and release archives
+/Brave-Extension/
+/releases/
+.cgcignore

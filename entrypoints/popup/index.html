@@ -3,13 +3,13 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Unclutter</title>
+    <title>Unclutter Ollama</title>
   </head>
   <body>
     <header>
       <div class="brand">
         <img src="/icon/32.png" width="28" height="28" alt="" />
-        <h1>Unclutter</h1>
+        <h1>Unclutter Ollama</h1>
       </div>
       <label class="switch" title="Enable everywhere"
         ><input id="global" type="checkbox" aria-label="Enable Unclutter everywhere" /><span></span
@@ -24,8 +24,8 @@
         </select>
       </div>
       <p id="auto-disclosure" class="disclosure" hidden>
-        On page visit automatically sends element snippets to Vercel AI Gateway for new templates.
-        Snippets may contain personal data. API charges apply. Cached templates are reused.
+        On page visit automatically sends element snippets to your configured Ollama server for new
+        templates. Snippets may contain personal data. Cached templates are reused.
       </p>
       <section id="page" class="page-card">
         <div class="site-line">
@@ -41,8 +41,8 @@
           ><button id="toggle" class="secondary" hidden>Pause</button>
         </div>
         <p id="disclosure" class="disclosure">
-          Analyze sends up to 60 element descriptions to Vercel AI Gateway. Main article text and
-          form values are excluded; snippets may still contain personal data.
+          Analyze sends up to 60 element descriptions to your configured Ollama server. Main article
+          text and form values are excluded; snippets may still contain personal data.
         </p>
       </section>
       <p id="error" role="alert" hidden></p>
@@ -53,33 +53,74 @@
         <button id="forget" class="text-button danger">Forget this page type</button>
       </details>
       <details id="connection">
-        <summary><span>Connection</span><span id="key-status">API key required</span></summary>
-        <form id="key-form">
+        <summary>
+          <span>Connection</span><span id="key-status">Server and model required</span>
+        </summary>
+        <div class="connection-body">
           <label for="provider">Provider</label
           ><select id="provider">
+            <option value="ollama">Ollama</option>
             <option value="vercel">Vercel AI Gateway</option>
             <option value="typesafe">TypeSafe AI</option>
           </select>
-          <label for="api-key">API key</label>
-          <div class="key-row">
+          <form id="ollama-form">
+            <label for="ollama-url">Ollama server</label>
             <input
-              id="api-key"
-              type="password"
+              id="ollama-url"
+              type="text"
               autocomplete="off"
               spellcheck="false"
-              placeholder="Paste Vercel AI Gateway key"
-            /><button type="submit" class="secondary">Save</button>
-          </div>
-          <p class="disclosure">
-            Stored on this device in extension storage, not encrypted or synced. Never sent to
-            websites.
-          </p>
-          <button id="remove-key" type="button" class="text-button" hidden>Remove saved key</button>
-        </form>
+              placeholder="IP address or server URL"
+              required
+            />
+            <label for="ollama-model">Model</label>
+            <input
+              id="ollama-model"
+              type="text"
+              autocomplete="off"
+              spellcheck="false"
+              placeholder="Model name from ollama list"
+              required
+            />
+            <div class="connection-actions">
+              <button id="save-ollama" type="submit" class="secondary">Save connection</button>
+              <button id="test-ollama" type="button" class="secondary">Test connection</button>
+            </div>
+            <p id="ollama-test-status" class="connection-status" role="status" hidden></p>
+            <p class="disclosure">
+              Enter an IP address, hostname, or full HTTP/HTTPS server URL. Port 11434 is used when
+              no port is given. Use a model already installed on that server.
+            </p>
+            <p class="disclosure">
+              Server and model are saved on this device in extension storage. Analysis goes to the
+              server you configure.
+            </p>
+          </form>
+          <form id="key-form" hidden>
+            <label for="api-key">API key</label>
+            <div class="key-row">
+              <input
+                id="api-key"
+                type="password"
+                autocomplete="off"
+                spellcheck="false"
+                placeholder="Paste Vercel AI Gateway key"
+              /><button type="submit" class="secondary">Save</button>
+            </div>
+            <p class="disclosure">
+              Stored on this device in extension storage, not encrypted or synced. Never sent to
+              websites.
+            </p>
+            <button id="remove-key" type="button" class="text-button" hidden>
+              Remove saved key
+            </button>
+          </form>
+        </div>
       </details>
     </main>
     <footer>
-      <span>Jev</span><span id="mode-hint">Manual analysis · Cached rules apply automatically</span>
+      <span id="provider-hint">Ollama</span
+      ><span id="mode-hint">Manual analysis · Cached rules apply automatically</span>
     </footer>
     <script type="module" src="./main.ts"></script>
   </body>

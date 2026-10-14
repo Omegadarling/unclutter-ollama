@@ -238,17 +238,22 @@ summary > span:first-child:before {
 details[open] summary > span:first-child:before {
   transform: rotate(90deg);
 }
-form {
+.connection-body {
   margin-top: 16px;
 }
-form > label {
+form {
+  margin: 0;
+}
+form > label,
+.connection-body > label {
   display: block;
   font-size: 11px;
   margin: 12px 0 6px;
   color: #586253;
 }
 select,
-input[type="password"] {
+input[type="password"],
+#ollama-form input {
   width: 100%;
   border: 1px solid #d9e0d4;
   border-radius: 7px;
@@ -263,6 +268,21 @@ input[type="password"] {
 }
 .key-row button {
   padding: 9px 12px;
+}
+.connection-actions {
+  display: flex;
+  gap: 7px;
+  margin-top: 12px;
+}
+.connection-actions button {
+  flex: 1;
+  padding: 9px 10px;
+}
+.connection-status {
+  color: #206c53;
+  font-size: 11px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
 }
 .text-button {
   background: none;
@@ -359,12 +379,14 @@ footer > span:first-child {
     border-color: #354032;
   }
   select,
-  input[type="password"] {
+  input[type="password"],
+  #ollama-form input {
     background: #222a23;
     color: #e0e6db;
     border-color: #45513f;
   }
-  form > label {
+  form > label,
+  .connection-body > label {
     color: #b9c4b0;
   }
   .rule {
@@ -377,7 +399,8 @@ footer > span:first-child {
     background: #442922;
     color: #ffc2b8;
   }
-  #notice {
+  #notice,
+  .connection-status {
     color: #90d5ae;
   }
 }

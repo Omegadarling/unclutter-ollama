@@ -1,12 +1,15 @@
 import { browser } from "wxt/browser";
 import { z } from "zod";
 import { evaluate } from "../lib/jev";
+import { validateOllamaConfig } from "../lib/ollama";
+import { executeOllama, checkOllama } from "../lib/ollama-executor";
 import { providers, providerKeyLabel, resolveProvider } from "../lib/providers";
 import {
   contextSchema,
   POLICY_VERSION,
   ANALYSIS_VERSION,
   shouldAutoAnalyze,
+  hasProviderConnection,
   profileSchema,
   snapshotSchema,
   unwrap,
@@ -27,6 +30,16 @@ const uiMessage = z.discriminatedUnion("type", [
   }),
   z.object({ type: z.literal("provider"), provider: z.enum(providers) }),
   z.object({ type: z.literal("removeKey") }),
+  z.object({
+    type: z.literal("saveOllama"),
+    url: z.string().max(2000),
+    model: z.string().max(200),
+  }),
+  z.object({
+    type: z.literal("testOllama"),
+    url: z.string().max(2000),
+    model: z.string().max(200),
+  }),
   z.object({ type: z.literal("global"), enabled: z.boolean() }),
   z.object({ type: z.literal("mode"), mode: z.enum(["manual", "auto"]) }),
   z.object({ type: z.literal("status"), tabId: z.number().int() }),
@@ -61,11 +74,20 @@ export default defineBackground(() => {
     .setAccessLevel?.({ accessLevel: "TRUSTED_CONTEXTS" })
     .catch(() => undefined);
   const settings = async (): Promise<Settings> => {
-    const data = await browser.storage.local.get(["enabled", "apiKey", "mode", "provider"]);
+    const data = await browser.storage.local.get([
+      "enabled",
+      "apiKey",
+      "mode",
+      "provider",
+      "ollamaUrl",
+      "ollamaModel",
+    ]);
     return {
       enabled: data.enabled !== false,
       apiKey: typeof data.apiKey === "string" ? data.apiKey : "",
-      provider: resolveProvider(data.provider),
+      provider: data.provider === undefined ? "ollama" : resolveProvider(data.provider),
+      ollamaUrl: typeof data.ollamaUrl === "string" ? data.ollamaUrl : "",
+      ollamaModel: typeof data.ollamaModel === "string" ? data.ollamaModel : "",
       mode: data.mode === "auto" ? "auto" : "manual",
     };
   };
@@ -131,18 +153,47 @@ export default defineBackground(() => {
       const before = await profile(snapshot.context);
       const attempt = (await browser.storage.local.get(attemptKey))[attemptKey];
       if (automatic && !shouldAutoAnalyze(config, before, !!attempt)) return;
-      if (!config.apiKey)
-        throw new Error(`Add your ${providerKeyLabel(config.provider)} API key first.`);
+      if (!hasProviderConnection(config))
+        throw new Error(
+          config.provider === "ollama"
+            ? "Save your Ollama server address and model in Connection first."
+            : `Add your ${providerKeyLabel(config.provider)} API key first.`,
+        );
       if (!config.enabled) throw new Error("Enable Unclutter before analyzing.");
       tabJobs.add(tabId);
       tabErrors.delete(tabId);
-      // Persist BEFORE making a paid request: a failed call or worker restart
+      // Persist BEFORE making an inference request: a failed call or worker restart
       // must not create a retry loop across navigation or another tab.
       await browser.storage.local.set({ [attemptKey]: { startedAt: Date.now(), error: null } });
       await badge(tabId);
-      const rules = await evaluate(snapshot, config.apiKey, config.provider);
+      // Extension API activity keeps the worker awake while streaming local inference.
+      const keepAlive = setInterval(() => {
+        void browser.runtime.getPlatformInfo().catch(() => undefined);
+      }, 20_000);
+      let rules;
+      try {
+        rules =
+          config.provider === "ollama"
+            ? await executeOllama(
+                snapshot,
+                validateOllamaConfig(config.ollamaUrl ?? "", config.ollamaModel ?? ""),
+              )
+            : await evaluate(snapshot, config.apiKey, config.provider);
+      } finally {
+        clearInterval(keepAlive);
+      }
       const latestConfig = await settings();
       if (!latestConfig.enabled || (automatic && latestConfig.mode !== "auto")) return;
+      if (
+        latestConfig.provider !== config.provider ||
+        (config.provider === "ollama"
+          ? latestConfig.ollamaUrl !== config.ollamaUrl ||
+            latestConfig.ollamaModel !== config.ollamaModel
+          : latestConfig.apiKey !== config.apiKey)
+      )
+        throw new Error(
+          "Connection changed during analysis. Result discarded; retry with your saved connection.",
+        );
       const current = snapshotSchema.parse(await send<Snapshot>(tabId, "snapshot"));
       if (current.url !== snapshot.url || current.context.key !== snapshot.context.key)
         throw new Error("Page changed during analysis. Result discarded.");
@@ -193,9 +244,12 @@ export default defineBackground(() => {
   });
 
   browser.runtime.onMessage.addListener((raw: unknown, sender, sendResponse) => {
+    // The offscreen page handles this private channel; do not race its reply.
+    if (raw && typeof raw === "object" && "target" in raw && raw.target === "ollama-offscreen")
+      return false;
     const handle = async (): Promise<unknown> => {
       if (sender.id !== browser.runtime.id) throw new Error("Untrusted sender.");
-      if (sender.tab) {
+      if (sender.tab && sender.url !== browser.runtime.getURL("/popup.html")) {
         const message = pageMessage.parse(raw);
         if (
           sender.frameId !== 0 ||
@@ -221,7 +275,7 @@ export default defineBackground(() => {
         return {
           profile: saved,
           enabled: config.enabled,
-          autoEnabled: config.mode === "auto" && !!config.apiKey,
+          autoEnabled: config.mode === "auto" && hasProviderConnection(config),
         };
       }
       if (sender.url !== browser.runtime.getURL("/popup.html"))
@@ -232,9 +286,23 @@ export default defineBackground(() => {
         return {
           enabled: config.enabled,
           hasKey: !!config.apiKey,
+          hasOllama: !!config.ollamaUrl && !!config.ollamaModel,
+          ollamaUrl: config.ollamaUrl ?? "",
+          ollamaModel: config.ollamaModel ?? "",
           provider: config.provider,
           mode: config.mode,
         };
+      }
+      if (message.type === "saveOllama" || message.type === "testOllama") {
+        const connection = validateOllamaConfig(message.url, message.model);
+        if (message.type === "testOllama") return checkOllama(connection);
+        await browser.storage.local.set({
+          ollamaUrl: connection.baseUrl,
+          ollamaModel: connection.model,
+          provider: "ollama",
+        });
+        await broadcast();
+        return null;
       }
       if (message.type === "saveKey") {
         await browser.storage.local.set({ apiKey: message.key, provider: message.provider });

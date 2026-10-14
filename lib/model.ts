@@ -65,7 +65,14 @@ export type Settings = {
   apiKey: string;
   provider: Provider;
   mode: "manual" | "auto";
+  ollamaUrl?: string;
+  ollamaModel?: string;
 };
+export function hasProviderConnection(settings: Settings): boolean {
+  return settings.provider === "ollama"
+    ? !!settings.ollamaUrl?.trim() && !!settings.ollamaModel?.trim()
+    : !!settings.apiKey.trim();
+}
 export function shouldAutoAnalyze(
   settings: Settings,
   profile: Profile | null,
@@ -74,7 +81,7 @@ export function shouldAutoAnalyze(
   return (
     settings.enabled &&
     settings.mode === "auto" &&
-    !!settings.apiKey &&
+    hasProviderConnection(settings) &&
     !attempted &&
     (!profile || (profile.enabled && profile.analysisVersion < ANALYSIS_VERSION))
   );

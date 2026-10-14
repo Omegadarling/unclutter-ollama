@@ -1,20 +1,29 @@
-export const providers = ["vercel", "typesafe"] as const;
+export const providers = ["vercel", "typesafe", "ollama"] as const;
 export type Provider = (typeof providers)[number];
+export type CloudProvider = Exclude<Provider, "ollama">;
 
 export function resolveProvider(value: unknown): Provider {
-  return value === "typesafe" ? "typesafe" : "vercel";
+  return value === "typesafe" || value === "ollama" ? value : "vercel";
 }
 
 export function providerLabel(provider: Provider): string {
-  return provider === "typesafe" ? "TypeSafe AI" : "Vercel AI Gateway";
+  return provider === "ollama"
+    ? "Ollama"
+    : provider === "typesafe"
+      ? "TypeSafe AI"
+      : "Vercel AI Gateway";
 }
 
 export function providerKeyLabel(provider: Provider): string {
-  return provider === "typesafe" ? "TypeSafe / Jev" : "Vercel AI Gateway";
+  return provider === "ollama"
+    ? "Ollama"
+    : provider === "typesafe"
+      ? "TypeSafe / Jev"
+      : "Vercel AI Gateway";
 }
 
 export function smokeCredentials(env: Record<string, string | undefined>): {
-  provider: Provider;
+  provider: CloudProvider;
   key: string;
 } {
   const gateway = env.AI_GATEWAY_API_KEY?.trim();

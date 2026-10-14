@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { categories, type Candidate, type Rule, type Snapshot } from "./model";
-import type { Provider } from "./providers";
+import type { CloudProvider } from "./providers";
 
 export const ENDPOINT = "https://ai-gateway.vercel.sh/v4/ai/evaluation-model";
 export const TYPESAFE_ENDPOINT = "https://api.typesafe.ai/v1/systemone";
@@ -71,7 +71,7 @@ export function rulesFromAnswers(raw: unknown, candidates: Candidate[]): Rule[] 
 export function evaluationCall(
   snapshot: Snapshot,
   key: string,
-  provider: Provider = "vercel",
+  provider: CloudProvider = "vercel",
 ): { url: string; init: RequestInit } {
   const direct = provider === "typesafe";
   const request = evaluationRequest(snapshot);
@@ -100,7 +100,7 @@ export function evaluationCall(
 export async function evaluate(
   snapshot: Snapshot,
   key: string,
-  provider: Provider = "vercel",
+  provider: CloudProvider = "vercel",
 ): Promise<Rule[]> {
   if (!snapshot.candidates.length) return [];
   const { url, init } = evaluationCall(snapshot, key, provider);
